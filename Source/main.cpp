@@ -8,6 +8,7 @@
 #include <cassert>
 #include <cstdint>
 #include <iostream>
+#include <algorithm>
 #include <filesystem>
 #include <functional>
 #include "../Contrib/blake2.h"
@@ -190,10 +191,12 @@ namespace xelous
 		while (l_Active);		
 	}
 
-    void Display()
+    void DisplayAndClean()
     {
+		g_Paths.erase(std::remove_if(g_Paths.begin(), g_Paths.end(), [](std::list<path>& p_List) { return p_List.empty(); }));
+
         for (auto& l_list : g_Paths)
-        {
+        {		
             for (auto& l_path : l_list)
             {
                 std::cout << l_path << "\r\n";
@@ -233,5 +236,5 @@ int main(int p_argc, char* p_argv[])
 
 	Process();
 
-    Display();
+    DisplayAndClean();
 }
