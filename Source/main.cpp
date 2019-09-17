@@ -29,6 +29,7 @@ namespace xelous
 		friend void WorkerFunction(const uint64_t& p_WorkerIndex, const path& p_Directory);
 
 		std::atomic_bool m_Active;
+        std::mutex m_Lock;
 		std::thread* m_WorkerThread;
 
 	public:
@@ -94,6 +95,7 @@ namespace xelous
 				// TODO - Log this somewhere else
 			}
 		}
+        std::scoped_lock<std::mutex> l_lock(g_Workers[p_WorkerIndex].m_Lock);
 		g_Workers[p_WorkerIndex].m_Active = false;
 	}
 
@@ -134,22 +136,25 @@ namespace xelous
 		uint16_t l_ActiveCount{ 0 };
 		for (auto& l_Worker : g_Workers)
 		{
-			if (!l_Worker.m_Active)
-			{
-				if (l_Worker.m_WorkerThread)
-				{
-					if (l_Worker.m_WorkerThread->joinable())
-					{
-						l_Worker.m_WorkerThread->join();
-					}
-					delete l_Worker.m_WorkerThread;
-					l_Worker.m_WorkerThread = nullptr;
-				}
-			}
-			else
-			{
-				++l_ActiveCount;
-			}
+            {
+                std::scoped_lock<std::mutex> l_lock(l_Worker.m_Lock);
+                if (!l_Worker.m_Active)
+                {
+                    if (l_Worker.m_WorkerThread)
+                    {
+                        if (l_Worker.m_WorkerThread->joinable())
+                        {
+                            l_Worker.m_WorkerThread->join();
+                        }
+                        delete l_Worker.m_WorkerThread;
+                        l_Worker.m_WorkerThread = nullptr;
+                    }
+                }
+                else
+                {
+                    ++l_ActiveCount;
+                }
+            }
 		}
 		return l_ActiveCount;
 	}	
@@ -178,6 +183,17 @@ namespace xelous
 		}
 		while (l_Active);		
 	}
+
+    void Display()
+    {
+        for (auto& l_list : g_Paths)
+        {
+            for (auto& l_path : l_list)
+            {
+                std::cout << l_path << "\r\n";
+            }
+        }
+    }
 }
 
 int main(int p_argc, char* p_argv[])
@@ -198,4 +214,6 @@ int main(int p_argc, char* p_argv[])
 	}
 
 	Process();
+
+    Display();
 }
