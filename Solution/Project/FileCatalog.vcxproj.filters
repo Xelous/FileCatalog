@@ -13,10 +13,69 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Contrib">
+      <UniqueIdentifier>{afcda77f-432e-4b80-8630-433b6617d919}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\Source\main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Contrib\blake2b.c">
+      <Filter>Contrib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Contrib\blake2bp.c">
+      <Filter>Contrib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Contrib\blake2s.c">
+      <Filter>Contrib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Contrib\blake2sp.c">
+      <Filter>Contrib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Contrib\blake2xb.c">
+      <Filter>Contrib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Contrib\blake2xs.c">
+      <Filter>Contrib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Contrib\genkat-c.c">
+      <Filter>Contrib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Contrib\genkat-json.c">
+      <Filter>Contrib</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\Contrib\blake2.h">
+      <Filter>Contrib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Contrib\blake2b-load-sse2.h">
+      <Filter>Contrib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Contrib\blake2b-load-sse41.h">
+      <Filter>Contrib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Contrib\blake2b-round.h">
+      <Filter>Contrib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Contrib\blake2-config.h">
+      <Filter>Contrib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Contrib\blake2-impl.h">
+      <Filter>Contrib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Contrib\blake2s-load-sse2.h">
+      <Filter>Contrib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Contrib\blake2s-load-sse41.h">
+      <Filter>Contrib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Contrib\blake2s-load-xop.h">
+      <Filter>Contrib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Contrib\blake2s-round.h">
+      <Filter>Contrib</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

@@ -50,6 +50,8 @@
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <EnableEnhancedInstructionSet>StreamingSIMDExtensions2</EnableEnhancedInstructionSet>
+      <PreprocessorDefinitions>__SSE2__;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -71,7 +73,27 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\Contrib\blake2b.c" />
+    <ClCompile Include="..\..\Contrib\blake2bp.c" />
+    <ClCompile Include="..\..\Contrib\blake2s.c" />
+    <ClCompile Include="..\..\Contrib\blake2sp.c" />
+    <ClCompile Include="..\..\Contrib\blake2xb.c" />
+    <ClCompile Include="..\..\Contrib\blake2xs.c" />
+    <ClCompile Include="..\..\Contrib\genkat-c.c" />
+    <ClCompile Include="..\..\Contrib\genkat-json.c" />
     <ClCompile Include="..\..\Source\main.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\Contrib\blake2-config.h" />
+    <ClInclude Include="..\..\Contrib\blake2-impl.h" />
+    <ClInclude Include="..\..\Contrib\blake2.h" />
+    <ClInclude Include="..\..\Contrib\blake2b-load-sse2.h" />
+    <ClInclude Include="..\..\Contrib\blake2b-load-sse41.h" />
+    <ClInclude Include="..\..\Contrib\blake2b-round.h" />
+    <ClInclude Include="..\..\Contrib\blake2s-load-sse2.h" />
+    <ClInclude Include="..\..\Contrib\blake2s-load-sse41.h" />
+    <ClInclude Include="..\..\Contrib\blake2s-load-xop.h" />
+    <ClInclude Include="..\..\Contrib\blake2s-round.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

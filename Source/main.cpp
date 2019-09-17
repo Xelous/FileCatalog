@@ -10,6 +10,7 @@
 #include <iostream>
 #include <filesystem>
 #include <functional>
+#include "../Contrib/blake2.h"
 
 namespace xelous
 {
@@ -49,6 +50,7 @@ namespace xelous
 		}
 	};
 
+    std::mutex g_WorkerLock;
 	std::vector<WorkerData> g_Workers;
 
 	const bool AddDirectory(const path& p_Path)
@@ -95,6 +97,7 @@ namespace xelous
 				// TODO - Log this somewhere else
 			}
 		}
+        std::scoped_lock<std::mutex> l_WorkerLock(g_WorkerLock);
         std::scoped_lock<std::mutex> l_lock(g_Workers[p_WorkerIndex].m_Lock);
 		g_Workers[p_WorkerIndex].m_Active = false;
 	}
@@ -127,7 +130,10 @@ namespace xelous
 					l_NextIndex,
 					l_path));			
 
-			g_Workers.push_back(WorkerData(l_Thread));
+            {
+                std::scoped_lock<std::mutex> l_WorkerLock(g_WorkerLock);
+                g_Workers.push_back(WorkerData(l_Thread));
+            }
 		}
 	}
 
@@ -194,6 +200,18 @@ namespace xelous
             }
         }
     }
+
+    using Hash = uint64_t;
+    constexpr auto HashSize = sizeof(Hash);
+
+    Hash Compute(const uint8_t* buffer,
+        const uint64_t& bufferSize)
+    {
+        Hash result{ 0 };
+        blake2b(reinterpret_cast<void*>(&result), HashSize, buffer, bufferSize, NULL, 0);
+        return result;
+    }
+
 }
 
 int main(int p_argc, char* p_argv[])
