@@ -5,8 +5,12 @@
 #include <atomic>
 #include <thread>
 #include <vector>
+#include <sstream>
+#include <cstdlib>
 #include <cassert>
 #include <cstdint>
+#include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <algorithm>
 #include <filesystem>
@@ -23,6 +27,109 @@ namespace xelous
 	std::vector<std::list<path>> g_Paths;
 	std::mutex g_DirectoriesLock;
 	std::queue<path> g_Directories;
+
+    using Hash = uint64_t;
+    constexpr auto HashSize = sizeof(Hash);
+
+    Hash Compute(const uint8_t* buffer, const uint64_t& bufferSize)
+    {
+        Hash result{ 0 };
+        blake2b(reinterpret_cast<void*>(&result), HashSize, buffer, bufferSize, NULL, 0);
+        return result;
+    }
+
+    class FileRecord
+    {
+    private:
+        const path m_Path;        
+        const uintmax_t m_FileSize;
+        Hash m_Hash;
+
+        friend void Report();
+        friend void HashWorker(const path& p_Path, char* p_Buffer, size_t& p_BufferSize);
+
+    public:
+        FileRecord(const path& p_Path)
+            :
+            m_Path(p_Path),
+            m_FileSize(exists(p_Path) ? file_size(p_Path) : 0),            
+            m_Hash(0)
+        {
+        }
+
+        const std::string ToXML() const 
+        {
+            std::ostringstream l_oss;
+            l_oss << "<File><Path>" << m_Path.string() << "</Path><Size>" << m_FileSize << "</Size><Hash>" << m_Hash << "</Hash></File>";
+            return l_oss.str();
+        }
+    };
+
+    std::mutex g_RecordsLock;
+    std::vector<FileRecord> g_Records;
+    std::mutex g_EmptyFilesLock;
+    std::vector<FileRecord> g_EmptyFiles;
+    std::mutex g_FailedFilesLock;
+    std::vector<FileRecord> g_FailedFiles;
+    std::mutex g_SpecialLock;
+    std::vector<FileRecord> g_SpecialFiles;
+
+    void HashWorker(const path& p_Path, char* p_Buffer, size_t& p_BufferSize)
+    {
+        FileRecord l_Record(p_Path);
+
+        if (l_Record.m_FileSize > 0)
+        {
+            if (p_Buffer)
+            {
+                if (p_BufferSize < l_Record.m_FileSize)
+                {
+                    p_Buffer = reinterpret_cast<char*>(realloc(reinterpret_cast<void*>(p_Buffer), p_BufferSize));                                        
+                    p_BufferSize = l_Record.m_FileSize;
+                }                
+            }
+            else
+            {
+                p_Buffer = reinterpret_cast<char*>(malloc(l_Record.m_FileSize));
+                p_BufferSize = l_Record.m_FileSize;
+            }
+
+            std::memset(p_Buffer, 0, p_BufferSize);
+
+            FILE* l_File = nullptr;
+            fopen_s(&l_File, p_Path.string().c_str(), "r");
+            if (l_File)
+            {                
+                const auto l_BytesRead = fread(reinterpret_cast<void*>(p_Buffer), 1, l_Record.m_FileSize, l_File);
+                if (l_BytesRead > 0) // l_Record.m_FileSize)
+                {
+                    l_Record.m_Hash = Compute(reinterpret_cast<uint8_t*>(p_Buffer), l_Record.m_FileSize);                    
+                }
+                else
+                {
+                    std::scoped_lock<std::mutex> l_lock(g_SpecialLock);
+                    g_SpecialFiles.push_back(l_Record);
+                }
+
+                fclose(l_File);
+
+                {
+                    std::scoped_lock<std::mutex> l_lock(g_RecordsLock);                    
+                    g_Records.push_back(std::move(l_Record));                    
+                }
+            }
+            else
+            {
+                std::scoped_lock<std::mutex> l_Lock(g_FailedFilesLock);
+                g_FailedFiles.push_back(l_Record);
+            }
+        }
+        else
+        {
+            std::scoped_lock<std::mutex> l_Lock(g_EmptyFilesLock);
+            g_EmptyFiles.push_back(l_Record);
+        }        
+    }
 
 	class WorkerData
 	{
@@ -191,34 +298,118 @@ namespace xelous
 		while (l_Active);		
 	}
 
-    void DisplayAndClean()
+    void Clean()
     {
-		g_Paths.erase(std::remove_if(g_Paths.begin(), g_Paths.end(), [](std::list<path>& p_List) { return p_List.empty(); }));
+		g_Paths.erase(std::remove_if(g_Paths.begin(), g_Paths.end(), [](std::list<path>& p_List) { return p_List.empty(); }));        
+    }    
 
-        for (auto& l_list : g_Paths)
-        {		
-            for (auto& l_path : l_list)
+    void HashProcessing()
+    {
+        std::cout << "\r\nProcessing Hashes\r\n";        
+                         
+        auto l_LambdaInstance = []()
+        {
+            bool l_Continue{ false };
+
+            char* l_Buffer = nullptr;
+            size_t l_BufferSize = 0;
+            std::list<path> l_Paths;
+
+            do
             {
-                std::cout << l_path << "\r\n";
+                {
+                    std::scoped_lock<std::mutex> l_Lock(g_PathsLock);
+                    l_Continue = !g_Paths.empty();
+                    if (l_Continue)
+                    {
+                        l_Paths = g_Paths.front();
+                        g_Paths.erase(g_Paths.begin(), g_Paths.begin() + 1);
+                    }
+                }
+
+                if (l_Continue)
+                {                                        
+                    for (const auto& l_File : l_Paths)
+                    {
+                        HashWorker(l_File, l_Buffer, l_BufferSize);
+                    }
+                }
             }
+            while (l_Continue);
+
+            if (l_Buffer)
+            {
+                free(l_Buffer);
+            }
+        };
+
+        std::vector<std::thread> l_Workers;
+        for (unsigned int i = 0; i < std::thread::hardware_concurrency(); ++i)
+        {
+            l_Workers.emplace_back(std::thread(l_LambdaInstance));
+        }        
+
+        while (!l_Workers.empty())
+        {            
+            std::cout << "\rHashing Workers [" << l_Workers.size() << "]";
+            for (auto l_Thread = l_Workers.begin(); l_Thread != l_Workers.end(); ++l_Thread)
+            {
+                if (l_Thread->joinable())
+                {
+                    l_Thread->join();
+                    l_Workers.erase(l_Thread, l_Thread + 1);
+                    break;
+                }
+            }
+            std::cout << "\rHashing Workers [" << l_Workers.size() << "]";
         }
     }
 
-    using Hash = uint64_t;
-    constexpr auto HashSize = sizeof(Hash);
-
-    Hash Compute(const uint8_t* buffer,
-        const uint64_t& bufferSize)
+    void Report()
     {
-        Hash result{ 0 };
-        blake2b(reinterpret_cast<void*>(&result), HashSize, buffer, bufferSize, NULL, 0);
-        return result;
+        std::cout << g_FailedFiles.size() << " Failed\r\n";
+        std::cout << g_EmptyFiles.size() << " Empty\r\n";
+        std::cout << g_Records.size() << " Recorded\r\n";
+
+        for (const auto& l_File : g_Records)
+        {
+            std::string l_string = l_File.m_Path.string();
+            if (l_string.length() > 25)
+            {
+                l_string = l_string.substr(l_string.length() - 25, 25);
+            }
+            if (l_File.m_Hash == 0)
+            {
+                int gothere = 1;
+            }
+            std::cout << std::setfill(' ') << std::setw(25) << l_string << "  " << std::setfill('0') << std::setw(20) << l_File.m_Hash << std::setfill(' ') << std::setw(20) << l_File.m_FileSize << "\r\n";
+        }
+    }
+
+    void Output()
+    {
+        path l_ThePath("./output.xml");
+        std::cout << "Outputting : " << l_ThePath.string() << std::endl;
+        std::ofstream l_OutputFile(l_ThePath.string().c_str(), std::ios_base::out);
+        if (l_OutputFile && l_OutputFile.is_open())
+        {
+            l_OutputFile << "<Files>\r\n";
+            for (const auto& l_File : g_Records)
+            {
+                l_OutputFile << l_File.ToXML() << "\r\n";
+            }
+            l_OutputFile << "</Files>\r\n";
+
+            l_OutputFile.close();
+        }
     }
 
 }
 
 int main(int p_argc, char* p_argv[])
 {
+    auto l_Start = std::chrono::steady_clock::now();
+
 	using namespace std::filesystem;
 	using namespace xelous;
 
@@ -231,10 +422,20 @@ int main(int p_argc, char* p_argv[])
 		{
 			g_Directories.push(l_p);
 		}
-
 	}
 
 	Process();
 
-    DisplayAndClean();
+    Clean();
+
+    HashProcessing();
+
+    auto l_End = std::chrono::steady_clock::now();    
+
+    //Report();
+
+    Output();
+
+    auto l_Duration = std::chrono::duration_cast<std::chrono::milliseconds>(l_End - l_Start);
+    std::cout << "Processed [" << g_Records.size() << "] in " << l_Duration.count() << "ms : " << (l_Duration.count() / 1000) << "s\r\n";
 }
